@@ -99,7 +99,7 @@ nextflow run -latest andersenlab/caendrprep-nf --debug
 You should run this in a screen or tmux session.
 
 ```
-nextflow andersenlab/caendrprep.nf --species=c_elegans --release=20250331
+nextflow andersenlab/caendrprep-nf --species=c_elegans --release=20250331
 ```
 
 # General Parameters
@@ -300,7 +300,7 @@ Skip running VCF delly analysis
 
 # Relevant docker images
 * `andersenlab-hetpolarization-1.10` ([link](https://hub.docker.com/r/andersenlab/hetpolarization:1.10)): Docker image is created within the pipeline [wi-gatk](https://github.com/AndersenLab/wi-gatk) using GitHub actions. Whenever a change is made to `env/hetpolarization.Dockerfile` or `.github/workflows/build_docker.yml` GitHub actions will create a new docker image and push if successful
-* `eclipse-temurin:23.0.2_7-jre-alpine-3.21` ([link](https://hub.docker.com/r/eclipse-temurin:23.0.2_7-jre-alpine-3.21)): Docker image maintained by Eclipse Temurin for OpenJDK
+* `andersenlab-java-24.36` ([link](https://hub.docker.com/r/andersenlab/java:24.36)): Docker image is created within this pipeline using GitHub actions. Whenever a change is made to `env/java.Dockerfile` or `.github/workflows/build_java_docker.yml` GitHub actions will create a new docker image and push if successful
 * `andersenlab-r_packages-v0.7` ([link](https://hub.docker.com/r/andersenlab/r_packages:v0.7)): Docker image is created manually, code can be found in the [dockerfile](https://github.com/AndersenLab/dockerfile/tree/master/r_packages) repo.
 * `bioconvert-bioconvert-0.6.1` ([link](https://hub.docker.com/r/bioconvert/bioconvert:0.6.1)): Docker image maintained by bioconvert for bioconvert
 * `andersenlab-tree-2022030116023027c1b8` ([link](https://hub.docker.com/r/andersenlab/tree:2022030116023027c1b8)): Docker image is created within this pipeline using GitHub actions. Whenever a change is made to `env/tree.Dockerfile` or `.github/workflows/build_tree_docker.yml` GitHub actions will create a new docker image and push if successful

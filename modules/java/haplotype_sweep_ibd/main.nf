@@ -6,10 +6,10 @@ process JAVA_HAPLOTYPE_SWEEP_IBD {
     input:
         tuple val(meta), path(vcf), path(vcf_index)
         path ibdseq
-        val contig
+        each contig
 
     output:
-        path "${contig}.ibd", emit: vcf
+        path "${contig}.ibd", emit: sweep
         path "versions.yml",  emit: versions
 
     when:
@@ -19,11 +19,11 @@ process JAVA_HAPLOTYPE_SWEEP_IBD {
     def args = task.ext.args ?: ''
     def avail_mem = (task.memory.giga).intValue() - 1
     """
-    java -Xmx${avail_mem} -jar ${ibdseq} gt=${vcf} minalleles=4 r2max=0.3 ibdlod=3 r2window=1500 nthreads=${task.cpus} chrom=${contig} out=${contig}
+    java -Xmx${avail_mem}g -jar ${ibdseq} gt=${vcf} minalleles=4 r2max=0.3 ibdlod=3 r2window=1500 nthreads=${task.cpus} chrom=${contig} out=${contig}
         
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        java: \$( java --version |& head -n 1 |& cut -f 2' )
+        java: \$( java --version |& head -n 2 |& tail -n 1 |& cut -d" " -f 6 |& sed 's/)//' )
     END_VERSIONS
     """
 
@@ -33,7 +33,7 @@ process JAVA_HAPLOTYPE_SWEEP_IBD {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        java: \$( java --version |& head -n 1 |& cut -f 2' )
+        java: \$( java --version |& head -n 2 |& tail -n 1 |& cut -d" " -f 6 |& sed 's/)//' )
     END_VERSIONS
     """
 }

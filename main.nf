@@ -39,11 +39,11 @@ if (params.debug == false) {
         bam_dir = null
     }
 
-    if (params.skip_delly == false || params.skip_pca == false || params.skip_postprocessing == false){
+    if (params.skip_delly == false || params.skip_pca == false || params.skip_postprocessing == false || params.skip_haplotypes == false){
         if (params.isotype_groups != null) {
             isogroups = params.isotype_groups
         } else {
-            concordance_dir = getGenomeAttribute("concordance_dir", "postprocessing, delly, and pca")
+            concordance_dir = getGenomeAttribute("concordance_dir", "postprocessing, delly, haplotypes, and pca")
             if (params.release != null) {
                 isogroups = "${concordance_dir}/${params.release}/isotype_groups.tsv"
             } else {
@@ -167,6 +167,23 @@ if (params.debug == false) {
         ref_strain = null
         reference = null
     }
+
+    if (params.skip_haplotypes == false && params.skip_postprocessing == true){
+        if (params.strain_vcf_dir != null) {
+            strain_vcf_dir = params.strain_vcf_dir
+        } else {
+            variant_dir = getGenomeAttribute("variation_dir", "haplotypes")
+            if (params.release != null) {
+                strain_vcf_dir = "${variant_dir}/${params.release}/vcf/strain_vcf"
+            } else {
+                println "A valid release date must be specified with --release"
+                exit 1
+            }
+        }
+    } else {
+        strain_vcf_dir = null
+    }
+
 }
 
 def log_summary() {
@@ -197,7 +214,7 @@ nextflow main.nf --isotype_groups=/path/to/groups --hard_isotype_vcf=/path/to/ha
     --hard_vcf            Path to hard-filtered full VCF file                     ${hard_vcf}
     --isotype_vcf         Path to hard-filtered isotype VCF file                  ${isotype_vcf}
     --snv_vcf             Path to hard-filtered SNV-only VCF file                 ${snv_vcf}
-    --isogroups           Path to isotype_groups file                             ${isogroups}
+    --isotype_groups      Path to isotype_groups file                             ${isogroups}
     --bam_dir             Path to folder containing bam files                     ${bam_dir}
     -output-dir           Output destination directory                            ${workflow.outputDir}
 
@@ -207,11 +224,12 @@ nextflow main.nf --isotype_groups=/path/to/groups --hard_isotype_vcf=/path/to/ha
 
     Haplotype parameters
     ====================
+    --strain_vcf_dir      Path to folder containing strain vcf files              ${strain_vcf_dir}
     --binsize             Size to partition genome into for finding coverage      ${params.binsize}
 
     Imputation parameters
     ====================
-    --map_dir             Directory containing contig LD maps                     ${params.map_dir}
+    --map_dir             Directory containing contig LD maps                     ${map_dir}
     --window              Window size for Beagle imputation                       ${params.window}
     --overlap             Overlap size for Beagle imputation                      ${params.overlap}
 
@@ -255,10 +273,10 @@ if (params.help) {
 // import the subworkflows
 include { VCF_POSTPROCESSING } from './subworkflows/vcf_postprocessing'
 include { VCF_HAPLOTYPES     } from './subworkflows/vcf_haplotypes'
-include { VCF_MAKE_TREE      } from './subworkflows/vcf_make_tree'
+// include { VCF_MAKE_TREE      } from './subworkflows/vcf_make_tree'
 include { VCF_IMPUTATION     } from './subworkflows/vcf_imputation'
-include { VCF_PCA            } from './subworkflows/vcf_pca'
-include { CALL_DELLY_INDELS  } from './subworkflows/call_delly_indels'
+// include { VCF_PCA            } from './subworkflows/vcf_pca'
+// include { CALL_DELLY_INDELS  } from './subworkflows/call_delly_indels'
 
 workflow { 
     main:
@@ -295,6 +313,10 @@ workflow {
         ch_isotype_strains = ch_isogroups.map{ row -> row.isotype_ref_strain }.unique()
     }
 
+    if (strain_vcf_dir != null) {
+        ch_strain_vcfs = ch_isotype_strains.map{ it -> [[id: it], "${strain_vcf_dir}/${it}.vcf.gz", "${strain_vcf_dir}/${it}.vcf.gz.tbi"] }
+    }
+
     // Run postprocessing analysis
     if (params.skip_postprocessing == false) {
         VCF_POSTPROCESSING(
@@ -303,14 +325,15 @@ workflow {
             ch_all_strains,
             ch_isotype_strains
         )
-        ch_isotype_vcf = VCF_POSTPROCESSING.out.isotype_vcf
-        ch_snv_vcf = VCF_POSTPROCESSING.out.snv_isotype_vcf
         ch_versions = ch_versions.mix(VCF_POSTPROCESSING.out.versions)
-        ch_pub_isotype_vcf = ch_isotype_vcf
-        ch_pub_snv_vcf = ch_snv_vcf
+        ch_isotype_vcf = VCF_POSTPROCESSING.out.isotype_vcf
+        ch_pub_isotype_vcf = VCF_POSTPROCESSING.out.isotype_vcf
+        ch_snv_vcf = VCF_POSTPROCESSING.out.snv_isotype_vcf
+        ch_pub_snv_vcf = VCF_POSTPROCESSING.out.snv_isotype_vcf
         ch_pub_soft_isotype_vcf = VCF_POSTPROCESSING.out.soft_isotype_vcf
         ch_pub_small_isotype_vcf = VCF_POSTPROCESSING.out.small_isotype_vcf
-        ch_pub_strain_vcfs = VCF_POSTPROCESSING.out.strain_vcfs
+        ch_strain_vcfs = VCF_POSTPROCESSING.out.strain_vcfs
+        ch_pub_strain_vcfs = ch_strain_vcfs
     } else {
         ch_pub_isotype_vcf = Channel.empty()
         ch_pub_snv_vcf = Channel.empty()
@@ -324,16 +347,16 @@ workflow {
         VCF_HAPLOTYPES(
             ch_isotype_vcf,
             ch_isotype_strains,
+            ch_strain_vcfs,
             bam_dir,
             params.binsize
         )
         ch_versions = ch_versions.mix(VCF_HAPLOTYPES.out.versions)
-        ch_pub_haplotype = VCF_HAPLOTYPES.out.haplotye
+        ch_pub_haplotype = VCF_HAPLOTYPES.out.haplotype_data
             .mix(VCF_HAPLOTYPES.out.haplotype_sweeps)
-        ch_pub_nemascan = VCF_HAPLOTYPES.out.nemascan
+        ch_pub_nemascan = VCF_HAPLOTYPES.out.nemascan_data
             .mix(VCF_HAPLOTYPES.out.nemascan_regions)
         ch_pub_divergent = VCF_HAPLOTYPES.out.divergent_regions
-            .mix(VCF_HAPLOTYPES.out.region_plot)
         ch_pub_divergent_masks = VCF_HAPLOTYPES.out.variant_coverage
     } else {
         ch_pub_haplotype = Channel.empty()
@@ -342,17 +365,17 @@ workflow {
         ch_pub_divergent_masks = Channel.empty()
     }
 
-    // Run phylogenetic tree analysis
-    if (params.skip_tree == false) {
-        VCF_MAKE_TREE(
-            ch_hard_vcf.concat(ch_isotype_vcf)
-        )
-        ch_versions = ch_versions.mix(VCF_MAKE_TREE.out.versions)
-        ch_pub_tree = VCF_MAKE_TREE.out.tree
-            .mix(VCF_MAKE_TREE.out.tree_plot)
-    } else {
-        ch_pub_tree = Channel.empty()
-    }
+    // // Run phylogenetic tree analysis
+    // if (params.skip_tree == false) {
+    //     VCF_MAKE_TREE(
+    //         ch_hard_vcf.concat(ch_isotype_vcf)
+    //     )
+    //     ch_versions = ch_versions.mix(VCF_MAKE_TREE.out.versions)
+    //     ch_pub_tree = VCF_MAKE_TREE.out.tree
+    //         .mix(VCF_MAKE_TREE.out.tree_plot)
+    // } else {
+    //     ch_pub_tree = Channel.empty()
+    // }
 
     // Run genotype imputation analysis
     if (params.skip_imputation == false) {
@@ -369,40 +392,40 @@ workflow {
         ch_pub_imputed = Channel.empty()
     }
 
-    // Run VCF PCA analysis
-    if (params.skip_pca == false) {
-        VCF_PCA(
-            ch_snv_vcf,
-            ch_isotype_strains,
-            params.ld_range,
-            params.outlier_iterations,
-            params.singletons
-        )
-        ch_versions = ch_versions.mix(VCF_PCA.out.versions)
-        ch_pub_eigenstrat = VCF_PCA.out.eigenstrat
-        ch_pub_pca_w_outliers = VCF_PCA.out.pca_w_outliers
-        ch_pub_pca_wo_outliers = VCF_PCA.out.pca_wo_outliers
-    } else {
-        ch_pub_eigenstrat = Channel.empty()
-        ch_pub_pca_w_outliers = Channel.empty()
-        ch_pub_pca_wo_outliers = Channel.empty()
-    }
+    // // Run VCF PCA analysis
+    // if (params.skip_pca == false) {
+    //     VCF_PCA(
+    //         ch_snv_vcf,
+    //         ch_isotype_strains,
+    //         params.ld_range,
+    //         params.outlier_iterations,
+    //         params.singletons
+    //     )
+    //     ch_versions = ch_versions.mix(VCF_PCA.out.versions)
+    //     ch_pub_eigenstrat = VCF_PCA.out.eigenstrat
+    //     ch_pub_pca_w_outliers = VCF_PCA.out.pca_w_outliers
+    //     ch_pub_pca_wo_outliers = VCF_PCA.out.pca_wo_outliers
+    // } else {
+    //     ch_pub_eigenstrat = Channel.empty()
+    //     ch_pub_pca_w_outliers = Channel.empty()
+    //     ch_pub_pca_wo_outliers = Channel.empty()
+    // }
 
-    // Run delly indel analysis
-    if (params.skip_delly == false) {
-        CALL_DELLY_INDELS(
-            ch_genome,
-            ch_all_strains,
-            bam_dir,
-            ref_strain,
-            params.minsize,
-            params.maxsize
-        )
-        ch_versions = ch_versions.mix(CALL_DELLY_INDELS.out.versions)
-        ch_pub_indels = CALL_DELLY_INDELS.out.indels
-    } else {
-        ch_pub_indels = Channel.empty()
-    }
+    // // Run delly indel analysis
+    // if (params.skip_delly == false) {
+    //     CALL_DELLY_INDELS(
+    //         ch_genome,
+    //         ch_all_strains,
+    //         bam_dir,
+    //         ref_strain,
+    //         params.minsize,
+    //         params.maxsize
+    //     )
+    //     ch_versions = ch_versions.mix(CALL_DELLY_INDELS.out.versions)
+    //     ch_pub_indels = CALL_DELLY_INDELS.out.indels
+    // } else {
+    //     ch_pub_indels = Channel.empty()
+    // }
 
     // Collate and save software versions
     ch_versions
@@ -411,11 +434,11 @@ workflow {
 
     publish:
     // Postprocessing outputs
-    ch_pub_isotype_vcf       >> "variation"
-    ch_pub_soft_isotype_vcf  >> "variation"
+    // ch_pub_isotype_vcf       >> "variation"
+    // ch_pub_soft_isotype_vcf  >> "variation"
     ch_pub_small_isotype_vcf >> "variation"
     ch_pub_snv_vcf           >> "variation"
-    ch_pub_strain_vcfs       >> "variation/strain_vcf"
+    // ch_pub_strain_vcfs       >> "variation/strain_vcf"
     
     // Haplotype outputs
     ch_pub_haplotype         >> "haplotype"
@@ -423,19 +446,19 @@ workflow {
     ch_pub_divergent         >> "divergent_regions"
     ch_pub_divergent_masks   >> "divergent_regions/Mask_DF"
 
-    // Phylogenetic tree outputs
-    ch_pub_tree              >> "tree"
+    // // Phylogenetic tree outputs
+    // ch_pub_tree              >> "tree"
 
     // Imputation outputs
     ch_pub_imputed           >> "variation"
 
-    // PCA outputs
-    ch_pub_eigenstrat        >> "eigenstrat/inputfiles"
-    ch_pub_pca_w_outliers    >> "eigenstrat/no_removal"
-    ch_pub_pca_wo_outliers   >> "eigenstrat/outlier_removal"
+    // // PCA outputs
+    // ch_pub_eigenstrat        >> "eigenstrat/inputfiles"
+    // ch_pub_pca_w_outliers    >> "eigenstrat/no_removal"
+    // ch_pub_pca_wo_outliers   >> "eigenstrat/outlier_removal"
 
-    // Indel outputs
-    ch_pub_indels            >> "variation/indels"
+    // // Indel outputs
+    // ch_pub_indels            >> "variation/indels"
 
     ch_collated_versions     >> "."
 }

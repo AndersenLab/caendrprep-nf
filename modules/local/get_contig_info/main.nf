@@ -18,10 +18,10 @@ process LOCAL_GET_CONTIG_INFO {
     script:
     def args = task.ext.args ?: ''
     """
-    zcat ${vcf} | head -n 200 | grep "##contig" | \
-        awk -v '{split(\$1,A,"="); split(A[3],B,","); CHROM=B[1]; split(A[4],C,">"); SIZE=C[1]; printf "%s\t%i\n", CHROM, SIZE;}' > contig_lengths.tsv
+    zcat ${vcf} | head -n 200 | grep "##contig" | \\
+        awk '{split(\$1,A,"="); split(A[3],B,","); CHROM=B[1]; split(A[4],C,">"); SIZE=C[1]; printf "%s\\t%i\\n", CHROM, SIZE;}' > contig_lengths.tsv
     cut -f 1 contig_lengths.tsv > contigs.txt
-    awk -v BINSIZE="${binsize} '{for (I=0;I<\$2;I+=BINSIZE){ END=I+BINSIZE; if (END > \$2) END=SIZE; printf "%s\t%i\t%i\n", \$1, I, END;} contig_lengths.tsv > genome_partition.bed
+    awk -v BINSIZE="${binsize}" '{if (NF > 1){ N=int(\$2/BINSIZE); for (I=0;I<=N;I++){ START=I*BINSIZE; STOP=START+BINSIZE; if (STOP > \$2) STOP=\$2; printf "%s\\t%i\\t%i\\n", \$1, START, STOP;}}}' contig_lengths.tsv > genome_partition.bed
     """
 
     stub:

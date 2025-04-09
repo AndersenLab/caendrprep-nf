@@ -24,7 +24,7 @@ process PLINK_MAKE_EIGENSTRAT {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        plink: \$( bcftools --version |& sed '1!d; s/^.*bcftools //' )
+        plink: \$( plink --version |& head -n 1 | cut -f 2' )
     END_VERSIONS
     """
 
@@ -37,7 +37,7 @@ process PLINK_MAKE_EIGENSTRAT {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bcftools: \$( bcftools --version |& sed '1!d; s/^.*bcftools //' )
+        plink: \$( plink --version |& head -n 1 | cut -f 2' )
     END_VERSIONS
     """
 }

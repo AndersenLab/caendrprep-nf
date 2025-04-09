@@ -16,9 +16,10 @@ workflow VCF_IMPUTATION {
     main:
     ch_versions = Channel.empty()
 
-    LOCAL_GET_CONTIG_INFO( ch_snv_vcf )
+    LOCAL_GET_CONTIG_INFO( ch_snv_vcf,
+                           1000 )
     ch_contig_map = LOCAL_GET_CONTIG_INFO.out.contigs
-        .map{ contig -> [contig, path("${map_dir}/chr${contig}.map")]}
+        .map{ contig -> [contig, "${map_dir}/chr${contig}.map"] }
 
     // Impute genotypes
     BEAGLE_IMPUTATION( ch_snv_vcf.first(),
@@ -27,16 +28,18 @@ workflow VCF_IMPUTATION {
                        overlap )
     ch_versions = ch_versions.mix(BEAGLE_IMPUTATION.out.versions)
 
-    // Concatenate imputed genotypes
-    ch_imputed = BEAGLE_IMPUTATION.out.imputed
-        .flatten()
-        .toSortedList()
-    BCFTOOLS_CONCAT_IMPUTED( ch_imputed )
-    ch_versions = ch_versions.mix(BCFTOOLS_CONCAT_IMPUTED.out.versions)
-    ch_imputed_vcf = BCFTOOLS_CONCAT_IMPUTED.out.vcf.map{ row -> [[id: row[0]], row[1], row[2]]}
+    // // Concatenate imputed genotypes
+    // ch_imputed = BEAGLE_IMPUTATION.out.imputed
+    //     .flatten()
+    //     .toSortedList()
+    // BCFTOOLS_CONCAT_IMPUTED( ch_imputed )
+    // ch_versions = ch_versions.mix(BCFTOOLS_CONCAT_IMPUTED.out.versions)
+    // ch_imputed_vcf = BCFTOOLS_CONCAT_IMPUTED.out.vcf.map{ row -> [[id: row[0]], row[1], row[2]] }
+
+    ch_imputed_vcf = Channel.empty()
 
     emit:
     imputed_vcf   = ch_imputed_vcf                    // channel: [ val(meta1), path(vcf), path(vcf_index) ]
-    imputed_stats = BCFTOOLS_CONCAT_IMPUTED.out.stats // val: stats
+    imputed_stats = Channel.empty() //BCFTOOLS_CONCAT_IMPUTED.out.stats // val: stats
     versions      = ch_versions                       // channel: val(version1), val(version2)...
 }

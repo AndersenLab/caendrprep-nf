@@ -3,14 +3,10 @@
     label 'r_divergent_regions'
 
     input:
-        tuple val(metas), path(mask_dfs)
+        path mask_dfs
         path reoptimized_divergent_region_script
         path contig_lengths
         path contig_bins
-
-        tuple val(meta), path(bam), path(bam_index)
-        tuple val(meta1), path(vcf), path(index)
-        path bin_file
 
     output:
         tuple path("divergent_regions_strain.bed"), path("divergent_regions_all.bed"), path("divergent_regions.png"), emit: divergent

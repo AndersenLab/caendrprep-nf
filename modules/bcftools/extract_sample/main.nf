@@ -17,8 +17,7 @@ process BCFTOOLS_EXTRACT_SAMPLE {
     script:
     def args = task.ext.args ?: ''
     """
-    bcftools view -s ${strain} -O u ${vcf} | \\
-      bcftools view -O v --min-af 0.000001 --max-af 0.999999 | \\
+    bcftools view -s ${strain} -O v -U ${vcf} | \\
       vcffixup - | \\
       bcftools view --threads ${task.cpus} -O z > ${strain}.vcf.gz
     bcftools index --tbi ${strain}.vcf.gz
