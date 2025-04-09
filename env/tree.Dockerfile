@@ -1,8 +1,8 @@
 FROM continuumio/miniconda
 MAINTAINER Katie Evans <kathryn.evans@northwestern.edu>
 
-COPY conda.yml .
-RUN conda env update -n root -f conda.yml && conda clean -a
+COPY tree_conda.yml .
+RUN conda env update -n root -f tree_conda.yml && conda clean -a
 
 RUN conda install bioconda::quicktree
 
